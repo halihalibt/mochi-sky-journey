@@ -1,4 +1,82 @@
 import * as THREE from 'three';
+import { i18n } from '../i18n/I18nManager';
+
+export type TowerZoneId =
+  | 'CLOUD_RUINS'
+  | 'SKY_GARDEN'
+  | 'STORM_MECH'
+  | 'AURORA_CRYSTAL'
+  | 'STARLIGHT_CROWN';
+
+export interface TowerZoneSpec {
+  id: TowerZoneId;
+  index: number;
+  startRatio: number;
+  endRatio: number;
+  primaryColor: number;
+  accentColor: number;
+  fogColor: number;
+  trackColor: number;
+  emissiveTrimColor: number;
+}
+
+export const TOWER_ZONES: TowerZoneSpec[] = [
+  {
+    id: 'CLOUD_RUINS',
+    index: 0,
+    startRatio: 0.0,
+    endRatio: 0.2,
+    primaryColor: 0x1e293b,
+    accentColor: 0x38bdf8,
+    fogColor: 0x0b1528,
+    trackColor: 0x263449,
+    emissiveTrimColor: 0x38bdf8
+  },
+  {
+    id: 'SKY_GARDEN',
+    index: 1,
+    startRatio: 0.2,
+    endRatio: 0.4,
+    primaryColor: 0x0f2922,
+    accentColor: 0x34d399,
+    fogColor: 0x071a18,
+    trackColor: 0x16382f,
+    emissiveTrimColor: 0x2dd4bf
+  },
+  {
+    id: 'STORM_MECH',
+    index: 2,
+    startRatio: 0.4,
+    endRatio: 0.6,
+    primaryColor: 0x271c3a,
+    accentColor: 0xf59e0b,
+    fogColor: 0x120d24,
+    trackColor: 0x2e2344,
+    emissiveTrimColor: 0xfbbf24
+  },
+  {
+    id: 'AURORA_CRYSTAL',
+    index: 3,
+    startRatio: 0.6,
+    endRatio: 0.8,
+    primaryColor: 0x0f2537,
+    accentColor: 0x22d3ee,
+    fogColor: 0x061626,
+    trackColor: 0x16334a,
+    emissiveTrimColor: 0x67e8f9
+  },
+  {
+    id: 'STARLIGHT_CROWN',
+    index: 4,
+    startRatio: 0.8,
+    endRatio: 1.0,
+    primaryColor: 0x1e1b4b,
+    accentColor: 0xc084fc,
+    fogColor: 0x050814,
+    trackColor: 0x282461,
+    emissiveTrimColor: 0xe879f9
+  }
+];
 
 export interface HelixConfig {
   towerRadius: number;
@@ -11,13 +89,13 @@ export interface HelixConfig {
 }
 
 export const DEFAULT_HELIX_CONFIG: HelixConfig = {
-  towerRadius: 14,
-  trackOffset: 2.6,
-  trackWidth: 4.2,
-  pitchPerRevolution: 18,
-  totalHeight: 360,
+  towerRadius: 14.5,
+  trackOffset: 2.8,
+  trackWidth: 4.8,
+  pitchPerRevolution: 20,
+  totalHeight: 480,
   minMarketCapUSD: 100_000_000,
-  maxMarketCapUSD: 1_960_000_000_000
+  maxMarketCapUSD: 2_487_527_052_037.3
 };
 
 export class TowerMath {
@@ -53,16 +131,27 @@ export class TowerMath {
     return (Math.max(0, y) / this.config.pitchPerRevolution) * (Math.PI * 2);
   }
 
+  public getZoneByHeight(y: number): TowerZoneSpec {
+    const ratio = THREE.MathUtils.clamp(y / this.config.totalHeight, 0, 0.9999);
+    for (const z of TOWER_ZONES) {
+      if (ratio >= z.startRatio && ratio < z.endRatio) {
+        return z;
+      }
+    }
+    return TOWER_ZONES[TOWER_ZONES.length - 1];
+  }
+
   public cylindricalToWorld(
     theta: number,
     jumpY: number = 0,
-    laneOffset: number = 0
+    laneOffset: number = 0,
+    allowExtendedOuter: boolean = false
   ): THREE.Vector3 {
-    const clampedLane = THREE.MathUtils.clamp(
-      laneOffset,
-      -this.config.trackWidth * 0.45,
-      this.config.trackWidth * 0.45
-    );
+    const maxInner = -this.config.trackWidth * 0.46;
+    const maxOuter = allowExtendedOuter
+      ? this.config.trackWidth * 0.95
+      : this.config.trackWidth * 0.46;
+    const clampedLane = THREE.MathUtils.clamp(laneOffset, maxInner, maxOuter);
     const radius = this.config.towerRadius + this.config.trackOffset + clampedLane;
     const baseY = this.thetaToBaseHeight(theta);
 
@@ -84,28 +173,41 @@ export class TowerMath {
     return tangent.normalize();
   }
 
+  public getOutwardNormalAtTheta(theta: number): THREE.Vector3 {
+    return new THREE.Vector3(Math.cos(theta), 0, Math.sin(theta)).normalize();
+  }
+
+  /**
+   * Computes an anti-occlusion orbital camera pose that keeps the spiral road,
+   * upcoming obstacles, and Mochi's landing indicator clearly visible.
+   */
   public computeOrbitalCameraPose(
     playerTheta: number,
-    playerJumpY: number
+    playerJumpY: number,
+    playerRadialLane: number = 0,
+    lookAheadBoost: number = 0
   ): { position: THREE.Vector3; lookAt: THREE.Vector3 } {
-    const baseRadius = this.config.towerRadius + this.config.trackOffset;
-    const cameraDistance = 15.5;
-    const cameraElevation = 6.8;
-    const lookAheadThetaOffset = 0.14;
+    const baseRadius =
+      this.config.towerRadius +
+      this.config.trackOffset +
+      playerRadialLane * 0.45;
+    const cameraDistance = 15.2 + Math.min(2.5, Math.max(0, playerJumpY * 0.25));
+    const cameraElevation = 6.9 + Math.max(0, playerJumpY * 0.48);
+    const lookAheadThetaOffset = 0.155 + lookAheadBoost;
 
-    const camAngle = playerTheta - 0.18;
+    const camAngle = playerTheta - 0.19;
     const playerBaseY = this.thetaToBaseHeight(playerTheta);
 
     const position = new THREE.Vector3(
       (baseRadius + cameraDistance) * Math.cos(camAngle),
-      playerBaseY + playerJumpY * 0.45 + cameraElevation,
+      playerBaseY + cameraElevation,
       (baseRadius + cameraDistance) * Math.sin(camAngle)
     );
 
     const lookAtTheta = playerTheta + lookAheadThetaOffset;
     const lookAt = new THREE.Vector3(
       baseRadius * Math.cos(lookAtTheta),
-      this.thetaToBaseHeight(lookAtTheta) + playerJumpY * 0.3 + 1.2,
+      this.thetaToBaseHeight(lookAtTheta) + playerJumpY * 0.32 + 1.15,
       baseRadius * Math.sin(lookAtTheta)
     );
 
@@ -113,12 +215,6 @@ export class TowerMath {
   }
 
   public static formatUSD(amount: number): string {
-    if (amount >= 1e12) {
-      return '$' + (amount / 1e12).toFixed(2) + 'T (' + (amount / 1e8).toFixed(0) + '亿)';
-    }
-    if (amount >= 1e9) {
-      return '$' + (amount / 1e9).toFixed(2) + 'B (' + (amount / 1e8).toFixed(1) + '亿)';
-    }
-    return '$' + (amount / 1e6).toFixed(1) + 'M (' + (amount / 1e8).toFixed(2) + '亿)';
+    return i18n.formatUSD(amount);
   }
 }

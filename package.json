@@ -1,7 +1,8 @@
 {
   "name": "mochi-sky-journey",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "Mochi: Journey to the Sky - GenLayer 3D Fantasy Adventure",
   "type": "module",
   "scripts": {
     "dev": "vite",

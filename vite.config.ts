@@ -7,7 +7,7 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     target: 'es2020',
-    chunkSizeWarningLimit: 1200,
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
         manualChunks: {

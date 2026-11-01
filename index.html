@@ -2,24 +2,61 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Mochi：通天之旅 | GenLayer Mochi Sky Journey</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#050814" />
+    <link rel="icon" type="image/svg+xml" href="./mochi-icon.svg" />
+    <title>Mochi：通天之旅 | Mochi: Journey to the Sky</title>
     <style>
-      html, body {
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-right: env(safe-area-inset-right, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-left: env(safe-area-inset-left, 0px);
+      }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
         margin: 0;
         padding: 0;
         width: 100%;
         height: 100%;
         overflow: hidden;
         background-color: #050814;
+        color: #f8fafc;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+          'Hiragino Sans GB', 'Microsoft YaHei', 'Hiragino Kaku Gothic ProN',
+          'Yu Gothic', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
         touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
       }
       canvas {
         display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #webgl-fallback {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at center, #0f172a 0%, #050814 100%);
+        color: #f8fafc;
+        z-index: 9999;
+        padding: 24px;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
       }
     </style>
   </head>
   <body>
+    <div id="webgl-fallback" role="alert"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

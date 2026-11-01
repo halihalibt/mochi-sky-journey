@@ -5,7 +5,7 @@ import { TowerMath } from './TowerMath';
 export class TransitionDirector {
   private readonly mochi: MochiCharacter;
   private readonly towerMath: TowerMath;
-  private readonly duration = 6.5;
+  private readonly duration = 7.2;
   private elapsed = 0;
   private active = false;
 
@@ -29,13 +29,38 @@ export class TransitionDirector {
     const landingPos = this.towerMath
       .cylindricalToWorld(0, 0, 0)
       .add(towerWorldOrigin);
-    const r = this.towerMath.config.towerRadius + this.towerMath.config.trackOffset + 8;
+    const r =
+      this.towerMath.config.towerRadius +
+      this.towerMath.config.trackOffset +
+      9.5;
 
+    // Sweeping panoramic spiral flight around the revealed 5-zone Sky Tower before landing at $100M base
     this.flightCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(towerWorldOrigin.x - 28, towerWorldOrigin.y + 42, towerWorldOrigin.z + 48),
-      new THREE.Vector3(towerWorldOrigin.x, towerWorldOrigin.y + 28, towerWorldOrigin.z + r + 12),
-      new THREE.Vector3(towerWorldOrigin.x + r, towerWorldOrigin.y + 14, towerWorldOrigin.z),
-      new THREE.Vector3(towerWorldOrigin.x, towerWorldOrigin.y + 5, towerWorldOrigin.z - r),
+      new THREE.Vector3(
+        towerWorldOrigin.x - 32,
+        towerWorldOrigin.y + 58,
+        towerWorldOrigin.z + 56
+      ),
+      new THREE.Vector3(
+        towerWorldOrigin.x,
+        towerWorldOrigin.y + 38,
+        towerWorldOrigin.z + r + 14
+      ),
+      new THREE.Vector3(
+        towerWorldOrigin.x + r + 4,
+        towerWorldOrigin.y + 22,
+        towerWorldOrigin.z
+      ),
+      new THREE.Vector3(
+        towerWorldOrigin.x,
+        towerWorldOrigin.y + 9,
+        towerWorldOrigin.z - r - 2
+      ),
+      new THREE.Vector3(
+        landingPos.x - 3.5,
+        landingPos.y + 2.2,
+        landingPos.z + 4.5
+      ),
       landingPos
     ]);
 
@@ -43,11 +68,31 @@ export class TransitionDirector {
     const finalCamWorld = finalCamPose.position.clone().add(towerWorldOrigin);
 
     this.cameraCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(towerWorldOrigin.x - 42, towerWorldOrigin.y + 48, towerWorldOrigin.z + 68),
-      new THREE.Vector3(towerWorldOrigin.x - 10, towerWorldOrigin.y + 32, towerWorldOrigin.z + 55),
-      new THREE.Vector3(towerWorldOrigin.x + 35, towerWorldOrigin.y + 18, towerWorldOrigin.z + 25),
+      new THREE.Vector3(
+        towerWorldOrigin.x - 48,
+        towerWorldOrigin.y + 66,
+        towerWorldOrigin.z + 78
+      ),
+      new THREE.Vector3(
+        towerWorldOrigin.x - 14,
+        towerWorldOrigin.y + 44,
+        towerWorldOrigin.z + 62
+      ),
+      new THREE.Vector3(
+        towerWorldOrigin.x + 38,
+        towerWorldOrigin.y + 24,
+        towerWorldOrigin.z + 28
+      ),
+      new THREE.Vector3(
+        towerWorldOrigin.x + 22,
+        towerWorldOrigin.y + 12,
+        towerWorldOrigin.z - 22
+      ),
       finalCamWorld
     ]);
+
+    this.mochi.setAirplaneVisible(true);
+    this.mochi.setState('fly');
   }
 
   public update(
@@ -66,7 +111,14 @@ export class TransitionDirector {
     this.mochi.root.position.copy(pos);
     this.mochi.root.lookAt(pos.clone().add(tangent));
 
-    if (rawT > 0.85 && this.mochi.airplaneGroup.visible) {
+    // Gentle banking roll during the orbital sweep around the tower
+    if (rawT < 0.84) {
+      const bankRoll = Math.sin(rawT * Math.PI * 2) * 0.28;
+      this.mochi.root.rotation.z += bankRoll;
+    }
+
+    // At 84% progress, Mochi dismounts the aircraft in a celebratory landing
+    if (rawT > 0.84 && this.mochi.airplaneGroup.visible) {
       this.mochi.setAirplaneVisible(false);
       this.mochi.setState('celebrate');
     }
@@ -74,17 +126,24 @@ export class TransitionDirector {
     const camPos = this.cameraCurve.getPointAt(t);
     camera.position.copy(camPos);
 
+    // First half of transition focuses high on the grand 5-zone tower reveal, then smoothly locks onto Mochi at the base
     const finalLookAt = this.towerMath
       .computeOrbitalCameraPose(0, 0)
       .lookAt.clone()
       .add(towerWorldOrigin);
+    const revealHeight = THREE.MathUtils.lerp(95, 18, Math.min(1, rawT * 1.4));
     const towerPanoramicFocus = new THREE.Vector3(
       towerWorldOrigin.x,
-      towerWorldOrigin.y + 26 * (1 - t),
+      towerWorldOrigin.y + revealHeight * (1 - t),
       towerWorldOrigin.z
     );
     const currentLookAt = towerPanoramicFocus.lerp(finalLookAt, t);
     camera.lookAt(currentLookAt);
+
+    this.mochi.update(dt, {
+      verticalVelocity: tangent.y * 8,
+      turnRate: Math.sin(rawT * Math.PI * 2) * 0.5
+    });
 
     if (rawT >= 1) {
       this.active = false;
